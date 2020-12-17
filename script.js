@@ -117,7 +117,8 @@ module.exports = class Administrator{
             await this.azureMediaServicesClient.streamingLocators.deleteMethod(resourceGroup, accountName, locator.name);
             let newLoc = await this.azureMediaServicesClient.streamingLocators.create(resourceGroup, accountName, locator.name, {
                 streamingPolicyName: "Predefined_ClearStreamingOnly",
-                assetName: locator.assetName
+                assetName: locator.assetName,
+                streamingLocatorId: locator.streamingLocatorId // New line here
             })
             console.log(newLoc);
             console.log("locator's streaming locatorID: " + locator.streamingLocatorId);
