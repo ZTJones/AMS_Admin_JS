@@ -122,8 +122,8 @@ module.exports = class Administrator{
             })
             console.log(newLoc);
             console.log("locator's streaming locatorID: " + locator.streamingLocatorId);
-            let test = await knex("assets").where("streaming_locator", locator.streamingLocatorId)
-            .update({streaming_locator: newLoc.streamingLocatorId})
+            // let test = await knex("assets").where("streaming_locator", locator.streamingLocatorId)
+            // .update({streaming_locator: newLoc.streamingLocatorId})
 
             console.log(test);
         });

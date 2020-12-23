@@ -6,7 +6,7 @@ const Administrator = new admin();
 
 const io = require('socket.io')(3000, {
     cors: {
-        origin: "http://localhost:5500",
+        origin: "http://localhost:5500", // Must be set to url used for interface
         methods: ["GET", "POST"]
     }
 });
