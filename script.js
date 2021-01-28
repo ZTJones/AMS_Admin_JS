@@ -114,6 +114,7 @@ module.exports = class Administrator{
         // this function refreshes the expired streaming locators
         let expiredList = await this.getExpiredLocators();
         expiredList.forEach(async locator => {
+            console.log(locator.assetName);
             await this.azureMediaServicesClient.streamingLocators.deleteMethod(resourceGroup, accountName, locator.name);
             let newLoc = await this.azureMediaServicesClient.streamingLocators.create(resourceGroup, accountName, locator.name, {
                 streamingPolicyName: "Predefined_ClearStreamingOnly",
