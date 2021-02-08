@@ -6,7 +6,7 @@ const Administrator = new admin();
 
 const io = require('socket.io')(3000, {
     cors: {
-        origin: "http://localhost:5500", // Must be set to url used for interface
+        origin: "http://127.0.0.1:5500",
         methods: ["GET", "POST"]
     }
 });
@@ -29,7 +29,8 @@ io.on("connection", socket => {
 
     socket.on('refresh_locators', async () => {
         console.log("Got a request to refresh the streaming locators");
-        Administrator.refreshExpired();
+       // Administrator.remakeAll();
+       Administrator.refreshExpired();
     })
 
     socket.on('populate_db', async () => {
@@ -37,5 +38,15 @@ io.on("connection", socket => {
         let results = await Administrator.transferStreamingLocators();
         socket.emit('table_results', JSON.stringify(results));
     });
+
+    socket.on("s_encode", async () => {
+        console.log("Got a request for a special encode.");
+        Administrator.encodeWithSaas();
+    });
+
+    socket.on("bigRedButton", async () => {
+        console.log("Got a request for a 2k locator build");
+        Administrator.buildEnvironment();
+    })
     
 })

@@ -1,3 +1,5 @@
+const uuidv4 = require("uuid/v4");
+
 const MediaServices = require("@azure/arm-mediaservices");
 const msRestAzure = require("@azure/ms-rest-azure-js");
 const msRest = require("@azure/ms-rest-js");
@@ -20,10 +22,6 @@ const aadClientId = "Your info here";
 const aadSecret = "Your info here";
 const aadDomain = "Your info here";
 const subscriptionId = "Your info here";
-
-
-// let azureMediaServicesClient;
-
 
 // msRestNodeAuth.loginWithServicePrincipalSecret()
 module.exports = class Administrator{
@@ -63,6 +61,99 @@ module.exports = class Administrator{
         console.log(locatorList);
         return locatorList;
     }
+
+    async getAllAssets(){
+        // This function gets then returns all assets
+        let assetList = await this.azureMediaServicesClient.assets.list(resourceGroup, accountName);
+        console.log(assetList);
+        return assetList;
+    }
+
+    async encodeWithSaas(){
+        // Encodes an asset with the hidden saasCae preset
+        let sourceURL = "https://testerx-zjonestemp-usea.streaming.media.azure.net/addaa4eb-588d-4b9b-9839-2f3c5467051e/m1_03_02_test.mp3";
+        let saasTransform = {
+            odatatype: "#Microsoft.Media.BuiltInStandardEncoderPreset",
+            presetName: "saasCae"
+        }
+        let encodeName = "saasCaeTransform"
+        let transform = await this.azureMediaServicesClient.transforms.get(resourceGroup, accountName, encodeName);
+        console.log(transform);
+        if(transform.error.code == "NotFound"){
+            console.log("Transform didn't exist, making one now")
+            transform = await this.azureMediaServicesClient.transforms.createOrUpdate(resourceGroup, accountName, encodeName, {
+                name: encodeName,
+                location: "East US",
+                outputs: [{
+                    preset: saasTransform
+                }]
+            })
+        }
+        let uniqueness = uuidv4();
+        console.log("uniqueness is: " + uniqueness);
+
+        let input = {
+            odatatype: "#Microsoft.Media.JobInputHttp",
+            files: [sourceURL]
+        }
+        let outputAssetName = "prefix-output-" + uniqueness;
+
+        let jobName = "prefix-job-" + uniqueness;
+        let locatorName = "locator" + uniqueness;
+        console.log("creating output asset...");
+
+        let outputAsset = await this.azureMediaServicesClient.assets.createOrUpdate(resourceGroup, accountName, outputAssetName, {})
+
+        console.log("submitting job...");
+        // submit input function
+        let jobOutputs = [
+            {
+                odatatype: "#Microsoft.Media.JobOutputAsset",
+                assetName: outputAssetName
+            }
+        ]
+
+        let job = await this.azureMediaServicesClient.jobs.create(resourceGroup, accountName, encodeName, jobName,{
+            input: input,
+            outputs: jobOutputs
+        })
+        // end function
+
+        console.log("waiting for job to finish...");
+        // we can fill this in later
+    }
+
+    async buildEnvironment(){
+        let failCount = 0;
+        let breakTime = new Date();
+        let consecFails = 0;
+        breakTime.setMinutes(breakTime.getMinutes() + 5);
+        for(let x = 0; x < 150; x++){
+            let uniqueness = uuidv4();
+            if(consecFails > 10) {
+                console.log("Stopping ENV build");
+                break;
+            }
+            try{
+
+                await this.azureMediaServicesClient.streamingLocators.create(resourceGroup, accountName, "locator-" + uniqueness, {
+                    streamingPolicyName: "Predefined_ClearStreamingOnly",
+                    assetName: "m4-4-2-mp3-20210028-180901_Output_20210028-181609",
+                    endTime: breakTime
+                })
+                consecFails = 0;
+            }catch(er){
+                failCount++;
+                consecFails++;
+                // console.log("FAIL COUNT: " + failCount);
+                console.log(er);
+                x--;
+                continue;
+            }
+            console.log(x);
+        }
+        console.log("FINAL FAIL COUNT" + failCount);
+    }
     
     async getExpiredLocators(){
         //
@@ -71,7 +162,7 @@ module.exports = class Administrator{
         let expiredList = [];
         locatorList.forEach(locator => {
             console.log(locator.endTime);
-            if(locator.endTime < Date.now()){
+            if(locator.endTime < Date.now()){ // Needs to check ahead of time
                 console.log("Expired");
                 expiredList.push(locator);
             }else{
@@ -84,6 +175,7 @@ module.exports = class Administrator{
 
     async transferStreamingLocators(){
         // this function creates DB copies of the streaming locators
+        // This call will only return 1000 results at a time
         let locatorList = await this.azureMediaServicesClient.streamingLocators.list(resourceGroup, accountName);
         console.log(locatorList);
         locatorList.forEach( async locator => {
@@ -112,21 +204,52 @@ module.exports = class Administrator{
 
     async refreshExpired(){
         // this function refreshes the expired streaming locators
+        
         let expiredList = await this.getExpiredLocators();
         expiredList.forEach(async locator => {
+            let breakTime = new Date();
+            breakTime.setMinutes(breakTime.getMinutes() + 5);
             console.log(locator.assetName);
-            await this.azureMediaServicesClient.streamingLocators.deleteMethod(resourceGroup, accountName, locator.name);
-            let newLoc = await this.azureMediaServicesClient.streamingLocators.create(resourceGroup, accountName, locator.name, {
-                streamingPolicyName: "Predefined_ClearStreamingOnly",
-                assetName: locator.assetName,
-                streamingLocatorId: locator.streamingLocatorId // New line here
-            })
-            console.log(newLoc);
-            console.log("locator's streaming locatorID: " + locator.streamingLocatorId);
-            // let test = await knex("assets").where("streaming_locator", locator.streamingLocatorId)
+            try{
+
+                await this.azureMediaServicesClient.streamingLocators.deleteMethod(resourceGroup, accountName, locator.name);
+                let failed = true;
+                while(failed){
+                    try{
+
+                        let newLoc = await this.azureMediaServicesClient.streamingLocators.create(resourceGroup, accountName, locator.name, {
+                            streamingPolicyName: "Predefined_ClearStreamingOnly",
+                            assetName: locator.assetName,
+                            streamingLocatorId: locator.streamingLocatorId,
+                            endTime: breakTime
+                        })
+                        failed = false;
+                    }catch(er){
+                        failed = true;
+                        console.log("Error: \n" + er);
+                    }
+                }
+                // this.azureMediaServicesClient.streamingLocators.create()
+                // console.log(newLoc);
+                // console.log("locator's streaming locatorID: " + locator.streamingLocatorId);
+            }catch(er){
+                console.log(er);
+            }
+                // let test = await knex("assets").where("streaming_locator", locator.streamingLocatorId)
             // .update({streaming_locator: newLoc.streamingLocatorId})
 
-            console.log(test);
         });
     }
+    // This is a good example of why you test the code. Line 242, locator is not defined.  Will delete all of your locators.
+    // async remakeAll(){
+    //     let allList = await this.getStreamingLocators();
+    //     allList.forEach( async loc => {
+    //         await this.azureMediaServicesClient.streamingLocators.deleteMethod(resourceGroup, accountName, loc.name);
+    //         await this.azureMediaServicesClient.streamingLocators.create(resourceGroup, accountName, locator.name, {
+    //             streamingPolicyName: "Predefined_ClearStreamingOnly",
+    //             assetName: locator.assetName,
+    //             streamingLocatorId: locator.streamingLocatorId 
+    //         })
+    //     });
+    // }
 }
