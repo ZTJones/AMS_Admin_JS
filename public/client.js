@@ -1,4 +1,4 @@
-const socket = io("http://localhost:3000");
+const socket = io("http://localhost:8000");
 
 document.getElementById("getLocButton").onclick = () => {
     console.log("requesting streaming locators");
@@ -21,8 +21,9 @@ document.getElementById("refreshButton").onclick = () => {
 }
 
 document.getElementById("s_EncodeButton").onclick = () => {
-    console.log("Asking politely for a special encode...");
-    socket.emit("s_encode");
+    // console.log("Asking politely for a special encode...");
+    // socket.emit("s_encode");
+    console.log("This feature is temporarily disabled.");
 }
 
 document.getElementById("bigRedButton").onclick = () => {
